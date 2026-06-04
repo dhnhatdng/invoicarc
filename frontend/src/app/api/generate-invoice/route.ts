@@ -20,16 +20,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Khởi tạo Gemini client
     const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // Sử dụng model gemini-1.5-flash tối ưu tốc độ và phản hồi JSON
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      }
-    });
 
     const systemPrompt = `You are an invoice assistant. Given a plain text work description, extract and return ONLY a JSON object with these fields:
 {
@@ -42,12 +33,49 @@ export async function POST(req: Request) {
 }
 All prices are in USDC. Do not add markdown or explanation.`;
 
-    const response = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: description }] }],
-      systemInstruction: systemPrompt,
-    });
+    // Danh sách các model để thử nghiệm phòng khi bị lỗi 404 ở một số tài khoản/khu vực
+    const modelsToTry = [
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro',
+      'gemini-1.5-pro-latest'
+    ];
 
-    const rawText = response.response.text().trim();
+    let rawText = '';
+    let lastError: unknown = null;
+
+    // Vòng lặp thử từng model cho đến khi thành công
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Attempting generation with model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            responseMimeType: 'application/json',
+          }
+        });
+
+        const response = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: description }] }],
+          systemInstruction: systemPrompt,
+        });
+
+        rawText = response.response.text().trim();
+        if (rawText) {
+          console.log(`Success using model: ${modelName}`);
+          lastError = null;
+          break; // Tìm thấy model chạy thành công, thoát khỏi vòng lặp
+        }
+      } catch (err) {
+        console.warn(`Model ${modelName} failed, trying next... Error:`, err);
+        lastError = err;
+      }
+    }
+
+    if (lastError) {
+      throw lastError; // Nếu tất cả các model đều thất bại thì mới báo lỗi
+    }
 
     // Loại bỏ code block markdown ```json ... ``` nếu có
     let jsonString = rawText;
