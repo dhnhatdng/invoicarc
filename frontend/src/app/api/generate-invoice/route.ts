@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -12,44 +12,44 @@ export async function POST(req: Request) {
       );
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Anthropic API key is not configured' },
+        { error: 'Gemini API key is not configured' },
         { status: 500 }
       );
     }
 
-    const anthropic = new Anthropic({ apiKey });
-
-    const systemPrompt = `You are an invoice assistant. Given a plain text work description, extract and return ONLY a JSON object with these fields:
-{ title, description, lineItems: [{name, quantity, unitPrice}], subtotal, currency: 'USDC', notes }
-All prices are in USDC. Do not add markdown or explanation.`;
-
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514', // Using requested model
-      max_tokens: 800,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: description,
-        },
-      ],
+    // Khởi tạo Gemini client
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Sử dụng model gemini-1.5-flash tối ưu tốc độ và phản hồi JSON
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      }
     });
 
-    let rawText = '';
-    const content = response.content[0];
-    if (content && content.type === 'text') {
-      rawText = content.text.trim();
-    } else {
-      return NextResponse.json(
-        { error: 'Unexpected response content type from AI assistant' },
-        { status: 500 }
-      );
-    }
+    const systemPrompt = `You are an invoice assistant. Given a plain text work description, extract and return ONLY a JSON object with these fields:
+{
+  "title": "Invoice title",
+  "description": "Invoice description",
+  "lineItems": [{"name": "Item description", "quantity": 1, "unitPrice": 100.0}],
+  "subtotal": 100.0,
+  "currency": "USDC",
+  "notes": "Any additional notes"
+}
+All prices are in USDC. Do not add markdown or explanation.`;
 
-    // Strip markdown code fences if they are returned by the AI
+    const response = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: description }] }],
+      systemInstruction: systemPrompt,
+    });
+
+    const rawText = response.response.text().trim();
+
+    // Loại bỏ code block markdown ```json ... ``` nếu có
     let jsonString = rawText;
     if (jsonString.startsWith('```json')) {
       jsonString = jsonString.slice(7);
@@ -67,7 +67,7 @@ All prices are in USDC. Do not add markdown or explanation.`;
       const parsedInvoice = JSON.parse(jsonString);
       return NextResponse.json(parsedInvoice);
     } catch {
-      console.error('Failed parsing AI response:', jsonString);
+      console.error('Failed parsing Gemini response:', jsonString);
       return NextResponse.json(
         {
           error: 'AI response failed to parse as valid JSON. Raw response is available.',
@@ -78,7 +78,7 @@ All prices are in USDC. Do not add markdown or explanation.`;
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
-    console.error('Anthropic API Call Error:', error);
+    console.error('Gemini API Call Error:', error);
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
