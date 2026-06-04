@@ -6,7 +6,17 @@ export async function POST(req: Request) {
     if (!description) return NextResponse.json({ error: 'Description is required' }, { status: 400 });
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'OpenAI API key is not configured' }, { status: 500 });
+    
+    // NẾU BỊ LỖI THIẾU KEY, SE IN RA DANH SÁCH CÁC BIẾN MÔI TRƯỜNG ĐANG CÓ TRÊN VERCEL
+    if (!apiKey) {
+      const envKeys = Object.keys(process.env).filter(
+        key => !key.startsWith('npm_') && !key.startsWith('NODE_') && !key.startsWith('AWS_')
+      );
+      return NextResponse.json({ 
+        error: 'OpenAI API key is not configured', 
+        debugAvailableKeys: envKeys 
+      }, { status: 500 });
+    }
 
     const systemPrompt = `You are an invoice assistant. Given a plain text work description, extract and return ONLY a JSON object with these fields:
 {
@@ -25,12 +35,12 @@ All prices are in USDC.`;
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Model siêu nhanh, rẻ và tối ưu JSON của OpenAI
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: description }
         ],
-        response_format: { type: 'json_object' } // Đảm bảo đầu ra luôn là JSON
+        response_format: { type: 'json_object' }
       })
     });
 
