@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.100.1",
     "@rainbow-me/rainbowkit": "^2.2.11",
     "@tanstack/react-query": "^5.101.0",
+    "@google/generative-ai": "^0.21.0",
     "lucide-react": "^1.17.0",
     "next": "14.2.35",
     "react": "^18",
