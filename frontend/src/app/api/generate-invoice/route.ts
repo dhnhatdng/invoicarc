@@ -15,7 +15,8 @@ export async function POST(req: Request) {
   "lineItems": [{"name": "Item description", "quantity": 1, "unitPrice": 100.0}],
   "subtotal": 100.0,
   "notes": "Any additional notes"
-}`;
+}
+All prices are in USDC.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -24,21 +25,24 @@ export async function POST(req: Request) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Model rẻ và nhanh nhất của OpenAI
+        model: 'gpt-4o-mini', // Model siêu nhanh, rẻ và tối ưu JSON của OpenAI
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: description }
         ],
-        response_format: { type: 'json_object' } // Ép buộc trả về JSON
+        response_format: { type: 'json_object' } // Đảm bảo đầu ra luôn là JSON
       })
     });
 
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || 'OpenAI API Error');
 
-    const parsedInvoice = JSON.parse(data.choices[0].message.content.trim());
+    const jsonString = data.choices[0].message.content.trim();
+    const parsedInvoice = JSON.parse(jsonString);
     return NextResponse.json(parsedInvoice);
   } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Error' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+    console.error('OpenAI Error:', error);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
