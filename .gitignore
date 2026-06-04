@@ -1,0 +1,18 @@
+# Next.js build artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Foundry artifacts
+contracts/out/
+contracts/cache/
+contracts/lib/
+
+# Local environment variables
+.env*.local
+.env
+
+# System files
+.DS_Store
+Thumbs.db
